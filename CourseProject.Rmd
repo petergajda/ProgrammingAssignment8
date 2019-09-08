@@ -1,0 +1,105 @@
+---
+title: 'Coursera: Practical Machine Learning Course Project'
+author: "Peter Gajda"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+*The analysis is part of the Coursera Practical Machine Learning class.
+We use data from sport device trackers, specifically from  accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The course project adresses the following task:*
+
+* Predict the manner in which they did the exercise
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading required packages
+```{r packages, warning=FALSE, message=FALSE}
+require(caret)
+require(randomForest)
+```
+
+# Setting seed for reproducibility
+```{r seed}
+set.seed(999)
+```
+
+# Data preparation
+
+Downloading the training and test datasets
+There are couple of missing values which are coded as "NA", "#DIV/0!" or "".
+In order to handle these data correctly we will transform these data to NA.
+
+```{r prep1}
+trainurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+traindata <- read.csv(trainurl, na.strings=c("NA", "#DIV/0!", ""))
+
+testurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testdata <- read.csv(testurl, na.strings=c("NA", "#DIV/0!", ""))
+```
+
+```{r prep2}
+# Columns which contain only missing values are deleted
+traindata <- traindata[,colSums(is.na(traindata)) == 0]
+testdata <-testdata[,colSums(is.na(testdata)) == 0]
+
+# The first seven columns are not necessary for our analysis, therefore we delete them
+traindata <- subset(traindata, select = -c(1:7))
+testdata <- subset(testdata, select = -c(1:7))
+```
+
+
+# Preparing data sets for cross validation
+
+In order to perform cross validation, we need to split the training dataset into
+two data sets. 80 % of the the training data is partioned to the training_subset variable.
+The remaining 20 % will be set to our validation_subset variable, which enables
+later cross validation. We use createDataPartition from the caret package and create
+two data matrices.
+
+```{r split}
+DataPartitions <- createDataPartition(traindata$classe, p = 0.80, list = FALSE)
+
+training_subset <- traindata[DataPartitions, ]
+validation_subset <- traindata[-DataPartitions, ]
+```
+
+# Random Forest 
+
+We will use a random forest decision tree for our model training, due to 
+its accuracy. The algorithm finds the influencing variables by averaging 
+the results of different decision trees. We use the randomForest function from
+the random forest package.
+The size of dataset is no limitation for us using this method.
+
+```{r rf}
+rfclass <- randomForest(classe ~. , data=training_subset, method="class")
+rfclass
+```
+
+# Prediction
+
+We use our model from the training_subset and test it against the validation_subset.
+We use confusionMatrix from the caret package in order to compare the predicted values
+for the validation data against the actual data from validation_subset.
+
+```{r prediction}
+prediction <- predict(rfclass, validation_subset, type = "class")
+confusionMatrix(prediction, validation_subset$classe)
+```
+
+The accuracy is 0.9967, hence the Overall-Out-Of-Sample Error is 0.0033
+This implies that only very few data of the test sample will be classified for
+the wrong variable.
+
+
+# Applying the model to the testdata
+
+```{r submission}
+submission <- predict(rfclass, testdata, type="class")
+submission
+```
+
+
